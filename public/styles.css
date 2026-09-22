@@ -91,6 +91,8 @@
   --r-sm: 3px;
   --r: 6px;
   --r-lg: 10px;
+  --r-panel: 15px;
+  --r-xl: 22px;
 
   --gap: 16px;
   --topbar: 56px;
@@ -100,7 +102,33 @@
   --body: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "Azeret Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  --t: 180ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  /*
+   * Bewegung. Die Kurven sind numerisch berechnete gedämpfte Federn - das ist
+   * der Unterschied zwischen "animiert" und "fühlt sich echt an": Elemente
+   * kommen zur Ruhe, statt abrupt zu stoppen.
+   *
+   * Fallback auf Bézier für Safari < 17.4; dort ist linear() unbekannt.
+   */
+  --spring-snap: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring-pop: cubic-bezier(0.18, 1.12, 0.3, 1);
+  --spring-sheet: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --t-fast: 140ms;
+  --t: 220ms;
+  --t-slow: 420ms;
+
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    /* Dämpfung 0.86, Überschwingen 0.5% - für Zustandswechsel */
+    --spring-snap: linear(0, 0.0459, 0.1516, 0.2823, 0.416, 0.5403, 0.6489, 0.7395, 0.8124, 0.8692, 0.9122, 0.9438, 0.9663, 0.9818, 0.9921, 0.9985, 1.0023, 1.0042, 1.0049, 1.0049, 1.0045, 1.0039, 1);
+    /* Dämpfung 0.68, Überschwingen 5.4% - für Auftritte */
+    --spring-pop: linear(0, 0.0522, 0.1764, 0.3332, 0.495, 0.6444, 0.7715, 0.8725, 0.9476, 0.9992, 1.0314, 1.0483, 1.0541, 1.0525, 1.0464, 1.0381, 1.0293, 1.021, 1.0138, 1.008, 1.0036, 1.0006, 0.9986, 0.9975, 0.9971, 0.9971, 0.9974, 0.9978, 1);
+    /* Dämpfung 0.82, Überschwingen 1.1% - für grosse Flächen */
+    --spring-sheet: linear(0, 0.046, 0.1531, 0.2867, 0.4243, 0.5527, 0.6648, 0.7581, 0.8326, 0.89, 0.9325, 0.9628, 0.9836, 0.997, 1.005, 1.0092, 1.0109, 1.011, 1.0101, 1.0087, 1.0072, 1.0057, 1.0043, 1.0032, 1);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -230,7 +258,7 @@ a {
   color: var(--base);
   font-weight: 600;
   text-decoration: none;
-  transition: top var(--t);
+  transition: top var(--t) var(--spring-snap);
 }
 
 .skip-link:focus {
@@ -366,12 +394,25 @@ a {
 /* --------------------------------------------------------------------------
    5. Kopfbereich
    -------------------------------------------------------------------------- */
+/*
+ * Durchscheinende Leiste mit Unschärfe: der Inhalt schiebt sich sichtbar
+ * darunter durch, statt hinter einer Blende zu verschwinden.
+ */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: var(--base);
+  background: rgba(18, 14, 10, 0.72);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
   padding-top: env(safe-area-inset-top);
+}
+
+/* Ohne Unschärfe-Unterstützung deckend, sonst wäre die Leiste unlesbar. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .topbar {
+    background: var(--base);
+  }
 }
 
 .topbar__inner {
@@ -443,11 +484,18 @@ a {
   font-weight: 600;
   cursor: pointer;
   transition:
-    background var(--t),
-    border-color var(--t),
-    color var(--t);
+    background var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out),
+    transform var(--t) var(--spring-snap);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+/* Kurzes Stauchen beim Antippen - das Gerät antwortet sofort. */
+.btn:active:not(:disabled) {
+  transform: scale(0.965);
+  transition-duration: 90ms;
 }
 
 .btn:disabled {
@@ -530,7 +578,15 @@ a {
   background: transparent;
   color: var(--ink-dim);
   cursor: pointer;
-  transition: color var(--t), border-color var(--t);
+  transition:
+    color var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out),
+    transform var(--t) var(--spring-snap);
+}
+
+.icon-btn:active {
+  transform: scale(0.9);
+  transition-duration: 90ms;
 }
 
 .icon-btn:hover {
@@ -546,7 +602,7 @@ a {
   border-radius: var(--r);
   background: var(--booth);
   color: var(--ink);
-  transition: border-color var(--t);
+  transition: border-color var(--t-fast) var(--ease-out);
 }
 
 .input:hover {
@@ -655,6 +711,22 @@ select.input option {
   margin: 0 auto;
   padding: var(--gap);
   padding-bottom: calc(var(--gap) + env(safe-area-inset-bottom));
+}
+
+/* Ansichten treten von unten auf – die Richtung sagt "vorwärts". */
+.view {
+  animation: view-in var(--t-slow) var(--spring-snap) both;
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .view[hidden] {
@@ -774,7 +846,7 @@ select.input option {
   margin-top: 40px;
   background: var(--rule);
   border: 1px solid var(--rule);
-  border-radius: var(--r);
+  border-radius: var(--r-panel);
   overflow: hidden;
 }
 
@@ -808,7 +880,7 @@ select.input option {
   margin-bottom: var(--gap);
   padding: 22px;
   border: 1px solid var(--rule);
-  border-radius: var(--r);
+  border-radius: var(--r-panel);
   background: var(--booth);
 }
 
@@ -989,7 +1061,8 @@ select.input option {
   min-width: 2px;
   border-radius: 1px;
   background: rgba(237, 224, 200, 0.1);
-  transition: background var(--t);
+  transform-origin: center bottom;
+  transition: background var(--t-fast) var(--ease-out);
 }
 
 .reel__frame[data-state="pass"] {
@@ -1063,7 +1136,7 @@ select.input option {
   gap: 14px;
   padding: 24px;
   border: 1px solid var(--rule);
-  border-radius: var(--r);
+  border-radius: var(--r-panel);
   color: var(--ink-dim);
   text-align: center;
 }
@@ -1119,8 +1192,16 @@ select.input option {
 
 .card--animated {
   transition:
-    transform 300ms cubic-bezier(0.2, 0.8, 0.25, 1),
-    opacity 300ms ease;
+    transform var(--t-slow) var(--spring-snap),
+    opacity 280ms var(--ease-out);
+}
+
+/* Die Karten darunter rücken mit Feder nach, wenn nicht gezogen wird. */
+.card[data-depth="1"],
+.card[data-depth="2"] {
+  transition:
+    transform var(--t-slow) var(--spring-snap),
+    filter var(--t-slow) var(--ease-out);
 }
 
 .card__perf {
@@ -1320,11 +1401,17 @@ select.input option {
   color: var(--ink);
   cursor: pointer;
   transition:
-    border-color var(--t),
-    color var(--t),
-    background var(--t);
+    border-color var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out),
+    transform var(--t) var(--spring-pop);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+.control:active:not(:disabled) {
+  transform: scale(0.9);
+  transition-duration: 90ms;
 }
 
 .control .icon {
@@ -1485,24 +1572,62 @@ kbd {
 /* --------------------------------------------------------------------------
    14. Matches-Schublade
    -------------------------------------------------------------------------- */
+/*
+ * Auf dem Handy ein Sheet von unten, wie man es dort erwartet – mit Griff und
+ * zum Wegwischen. Auf breiten Schirmen bleibt es eine seitliche Schublade.
+ */
 .drawer {
   position: fixed;
-  top: 0;
   right: 0;
   bottom: 0;
+  left: 0;
   z-index: 60;
-  width: min(390px, 90vw);
-  padding: 18px;
-  padding-top: calc(18px + env(safe-area-inset-top));
+  max-height: 84vh;
+  max-height: 84dvh;
+  padding: 0 18px calc(22px + env(safe-area-inset-bottom));
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--booth);
-  border-left: 1px solid var(--rule-strong);
-  transform: translateX(100%);
-  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.25, 1);
+  border-top: 1px solid var(--rule-strong);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: 0 -24px 70px rgba(0, 0, 0, 0.55);
+  transform: translateY(100%);
+  transition: transform var(--t-slow) var(--spring-sheet);
+  will-change: transform;
 }
 
 .drawer[data-open="true"] {
   transform: none;
+}
+
+/* Beim Ziehen: die Fläche folgt dem Finger ohne Verzögerung. */
+.drawer[data-dragging="true"] {
+  transition: none;
+}
+
+.drawer__grabber {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  margin: 0 -18px;
+  padding: 11px 0 7px;
+  background: var(--booth);
+  cursor: grab;
+  touch-action: none;
+}
+
+.drawer__grabber::before {
+  content: "";
+  width: 42px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--rule-strong);
+}
+
+.drawer__grabber:active {
+  cursor: grabbing;
 }
 
 .drawer__head {
@@ -1521,7 +1646,10 @@ kbd {
   position: fixed;
   inset: 0;
   z-index: 55;
-  background: rgba(8, 5, 3, 0.62);
+  background: rgba(8, 5, 3, 0.58);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: overlay-fade var(--t) var(--ease-out) both;
 }
 
 /* --------------------------------------------------------------------------
@@ -1537,7 +1665,32 @@ kbd {
   padding-top: calc(16px + env(safe-area-inset-top));
   padding-bottom: calc(16px + env(safe-area-inset-bottom));
   overflow-y: auto;
-  background: rgba(8, 5, 3, 0.9);
+  /* Material statt Farbfläche: der Raum dahinter bleibt als Tiefe spürbar. */
+  background: rgba(8, 5, 3, 0.66);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  backdrop-filter: blur(22px) saturate(1.25);
+}
+
+/*
+ * Der Match ist der emotionale Höhepunkt der App. Er bekommt deshalb eine
+ * zusammenhängende Sequenz statt verstreuter Effekte - in der Bildsprache des
+ * Projektors: die Lampe zündet, der Kader fädelt ein, Licht wandert über das
+ * Bild, dann kommt der Text gestaffelt nach.
+ *
+ * Alle Schritte hängen an .overlay--play. Die Klasse wird beim Öffnen neu
+ * gesetzt, damit die Sequenz auch beim zweiten Match in Folge von vorn läuft.
+ */
+.overlay--play {
+  animation: overlay-fade var(--t) var(--ease-out) both;
+}
+
+@keyframes overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Das Licht der Lampe hinter dem Bild – statt Konfetti. */
@@ -1545,14 +1698,34 @@ kbd {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(48vmin 48vmin at 50% 38%, rgba(255, 158, 27, 0.4), transparent 68%);
-  animation: bloom 2.6s ease-in-out infinite;
+  background:
+    radial-gradient(88vmin 76vmin at 50% 42%, rgba(255, 158, 27, 0.34), transparent 70%),
+    radial-gradient(34vmin 34vmin at 50% 34%, rgba(255, 198, 110, 0.26), transparent 65%);
+  opacity: 0.9;
+}
+
+/* Die Lampe zündet: aus einem Punkt heraus, dann ruhiges Atmen. */
+.overlay--play .overlay__bloom {
+  animation:
+    lamp-strike 700ms var(--spring-pop) 60ms both,
+    bloom 3.4s ease-in-out 760ms infinite;
+}
+
+@keyframes lamp-strike {
+  from {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  to {
+    opacity: 0.85;
+    transform: scale(1);
+  }
 }
 
 @keyframes bloom {
   0%,
   100% {
-    opacity: 0.75;
+    opacity: 0.78;
   }
   50% {
     opacity: 1;
@@ -1566,16 +1739,114 @@ kbd {
   overflow-y: auto;
   padding: 26px 22px 24px;
   border: 1px solid var(--rule-strong);
-  border-radius: var(--r);
+  border-radius: var(--r-lg);
   background: var(--booth);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
   text-align: center;
-  animation: cut-in 340ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 
-@keyframes cut-in {
+.overlay--play .overlay__card {
+  animation: card-in 620ms var(--spring-pop) 80ms both;
+}
+
+@keyframes card-in {
   from {
     opacity: 0;
-    transform: scale(0.94);
+    transform: translateY(26px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Der Kader fädelt von oben ins Bildfenster ein, wie Film in den Projektor.
+ */
+.overlay--play .overlay__frame {
+  animation: thread-in 500ms var(--spring-snap) 170ms both;
+}
+
+@keyframes thread-in {
+  from {
+    opacity: 0;
+    transform: translateY(-26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Licht wandert einmal über das Poster. */
+.overlay__frame::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  background: linear-gradient(
+    104deg,
+    transparent 40%,
+    rgba(255, 233, 196, 0.3) 50%,
+    transparent 60%
+  );
+  transform: translateX(-130%);
+}
+
+.overlay--play .overlay__frame::after {
+  animation: light-sweep 900ms var(--ease-out) 360ms both;
+}
+
+@keyframes light-sweep {
+  to {
+    transform: translateX(130%);
+  }
+}
+
+/*
+ * Der Text kommt gestaffelt nach. Die Verzögerungen sind eng genug, dass es
+ * als eine Bewegung liest, nicht als Abfolge einzelner Auftritte.
+ */
+.overlay--play .eyebrow,
+.overlay--play .overlay__kicker,
+.overlay--play .overlay__movie,
+.overlay--play .overlay__lead,
+.overlay--play .mono-label,
+.overlay--play .overlay__overview,
+.overlay--play .overlay__liked,
+.overlay--play .overlay__actions {
+  animation: reveal 420ms var(--spring-snap) both;
+}
+
+.overlay--play .eyebrow {
+  animation-delay: 150ms;
+}
+.overlay--play .overlay__kicker {
+  animation-delay: 190ms;
+}
+.overlay--play .overlay__movie {
+  animation-delay: 300ms;
+}
+.overlay--play .overlay__lead {
+  animation-delay: 330ms;
+}
+.overlay--play .mono-label {
+  animation-delay: 355ms;
+}
+.overlay--play .overlay__overview {
+  animation-delay: 385ms;
+}
+.overlay--play .overlay__liked {
+  animation-delay: 415ms;
+}
+.overlay--play .overlay__actions {
+  animation-delay: 445ms;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -1592,8 +1863,11 @@ kbd {
   height: 30px;
   border: 2px solid var(--lamp);
   border-radius: 50%;
-  opacity: 0.85;
-  animation: cue-flash 1.5s ease-out 1 both;
+  opacity: 0;
+}
+
+.overlay--play .cue {
+  animation: cue-flash 1.4s ease-out 300ms 1 both;
 }
 
 @keyframes cue-flash {
@@ -1629,6 +1903,7 @@ kbd {
 }
 
 .overlay__frame {
+  position: relative;
   display: flex;
   width: 168px;
   margin: 20px auto 16px;
@@ -1727,7 +2002,7 @@ kbd {
   background: var(--gate);
   font-size: 0.875rem;
   text-align: left;
-  animation: toast-in 200ms ease both;
+  animation: toast-in 380ms var(--spring-pop) both;
 }
 
 .toast[data-type="error"] {
@@ -1745,7 +2020,7 @@ kbd {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(-14px) scale(0.96);
   }
   to {
     opacity: 1;
@@ -1794,6 +2069,31 @@ kbd {
 @media (min-width: 560px) {
   .features {
     grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Ab Tablet-Breite wieder als seitliche Schublade statt Sheet. */
+@media (min-width: 720px) {
+  .drawer {
+    top: 0;
+    left: auto;
+    width: min(390px, 90vw);
+    max-height: none;
+    padding: 18px;
+    padding-top: calc(18px + env(safe-area-inset-top));
+    border-top: 0;
+    border-left: 1px solid var(--rule-strong);
+    border-radius: 0;
+    box-shadow: -24px 0 70px rgba(0, 0, 0, 0.5);
+    transform: translateX(100%);
+  }
+
+  .drawer[data-open="true"] {
+    transform: none;
+  }
+
+  .drawer__grabber {
+    display: none;
   }
 }
 
@@ -1952,7 +2252,13 @@ kbd {
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    /* Ohne das bliebe der gestaffelte Text hier eine halbe Sekunde unsichtbar. */
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .overlay__frame::after {
+    display: none;
   }
 
   .filmstrip__track {

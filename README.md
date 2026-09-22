@@ -269,6 +269,27 @@ Projektorlampen-Bernstein als Marke, Schneidetisch-Grün für „behalten",
 Überblendzeichen-Rot für „weiter". Alle Textfarben erfüllen mindestens
 WCAG AA auf allen Flächen.
 
+**Bewegung** folgt Apple-Physik in der Bildsprache des Projektors. Die
+Übergangskurven sind numerisch berechnete gedämpfte Federn, als CSS-`linear()`
+hinterlegt (Fallback auf Bézier für Safari < 17.4) – Elemente kommen zur Ruhe,
+statt abrupt zu stoppen:
+
+| Kurve | Dämpfung | Verwendung |
+| --- | --- | --- |
+| `--spring-snap` | 0.86 | Zustandswechsel, Karten, Ansichten |
+| `--spring-pop` | 0.68 | Auftritte mit spürbarem Nachfedern |
+| `--spring-sheet` | 0.82 | grosse Flächen wie das Sheet |
+
+Der Match ist eine zusammenhängende Sequenz statt verstreuter Effekte: Die
+Lampe zündet, der Kader fädelt von oben ins Bildfenster ein, Licht wandert
+einmal über das Poster, das Überblendzeichen brennt ein, der Text kommt
+gestaffelt nach. Auf dem Handy erscheint die Matches-Liste als Sheet von unten,
+mit Griff und zum Wegwischen; ab Tablet-Breite bleibt es eine seitliche
+Schublade. Animiert werden ausschliesslich `transform` und `opacity`.
+
+`prefers-reduced-motion` schaltet Dauer **und Verzögerungen** ab – ohne
+Letzteres bliebe gestaffelter Text sonst sekundenlang unsichtbar.
+
 **Schriften** liegen unter `public/fonts/` im Repository – Big Shoulders
 Display (Anzeige), Archivo (Fließtext), Azeret Mono (Daten). Kein Google-Fonts-
 CDN: Die App sieht ohne Internetzugang identisch aus, und die CSP erlaubt nur

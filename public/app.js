@@ -202,6 +202,7 @@
     btnBackToSwipe: $('btn-back-to-swipe'),
 
     matchesPanel: $('matches-panel'),
+    drawerGrabber: $('drawer-grabber'),
     matchesList: $('matches-list'),
     btnCloseMatches: $('btn-close-matches'),
     drawerBackdrop: $('drawer-backdrop'),
@@ -727,7 +728,10 @@
   function updateDragVisual(card, dx, dy) {
     const threshold = swipeThreshold(card);
     const rotation = clamp((dx / card.getBoundingClientRect().width) * 22, -22, 22);
-    card.style.transform = `translate(${dx}px, ${dy * 0.35}px) rotate(${rotation}deg)`;
+    // Leichtes Anheben beim Ziehen – die Karte kommt aus dem Stapel heraus.
+    const lift = 1 + Math.min(Math.hypot(dx, dy) / 700, 0.022);
+    card.style.transform =
+      `translate(${dx}px, ${dy * 0.35}px) rotate(${rotation}deg) scale(${lift.toFixed(4)})`;
 
     const intensity = clamp(Math.abs(dx) / threshold, 0, 1);
     const keep = card.querySelector('.card__mark--keep');
@@ -738,6 +742,24 @@
     const scale = 0.8 + intensity * 0.2;
     keep.style.transform = `scale(${scale})`;
     pass.style.transform = `scale(${scale})`;
+
+    // Die Karte darunter rückt schon während des Ziehens nach vorn. Ohne das
+    // wirkt der Stapel starr, bis der Swipe fertig ist.
+    const next = dom.cardStack.querySelector('.card[data-depth="1"]');
+    if (next) {
+      const y = (14 - 14 * intensity).toFixed(2);
+      const s = (0.968 + 0.032 * intensity).toFixed(4);
+      next.style.transform = `translateY(${y}px) scale(${s})`;
+      next.style.filter = `brightness(${(0.66 + 0.34 * intensity).toFixed(3)})`;
+    }
+  }
+
+  /** Setzt die mitbewegte Folgekarte auf ihren Ruhezustand zurück. */
+  function resetNextCard() {
+    const next = dom.cardStack.querySelector('.card[data-depth="1"]');
+    if (!next) return;
+    next.style.transform = '';
+    next.style.filter = '';
   }
 
   function resetCardPosition(card) {
@@ -745,7 +767,8 @@
     card.style.transform = '';
     card.querySelector('.card__mark--keep').style.opacity = '0';
     card.querySelector('.card__mark--pass').style.opacity = '0';
-    setTimeout(() => card.classList.remove('card--animated'), 320);
+    resetNextCard();
+    setTimeout(() => card.classList.remove('card--animated'), 420);
   }
 
   /** Lässt die Karte aus dem Bildschirm fliegen und meldet den Swipe. */
@@ -887,15 +910,17 @@
      ====================================================================== */
 
   /**
-   * Startet die Überblendzeichen-Animation neu. Im Kino kündigt dieser Kreis
-   * oben rechts im Bild den Rollenwechsel an – hier den Match.
+   * Startet die Match-Sequenz von vorn: Lampe zündet, Kader fädelt ein, Licht
+   * wandert über das Bild, Text kommt gestaffelt nach.
+   *
+   * Die Klasse wird entfernt und nach einem erzwungenen Reflow neu gesetzt.
+   * Ohne das liefe die Sequenz beim zweiten Match in Folge nicht erneut, weil
+   * das Overlay zwischendurch gar nicht ausgeblendet wird.
    */
-  function flashCueMark() {
-    const cue = dom.overlay.querySelector('.cue');
-    if (!cue) return;
-    cue.style.animation = 'none';
-    void cue.offsetWidth; // Reflow erzwingen, sonst läuft die Animation nicht erneut
-    cue.style.animation = '';
+  function playMatchSequence() {
+    dom.overlay.classList.remove('overlay--play');
+    void dom.overlay.offsetWidth;
+    dom.overlay.classList.add('overlay--play');
   }
 
   function showMatchOverlay(match) {
@@ -920,8 +945,9 @@
     dom.overlayLikedBy.textContent = (match.likedBy || []).join(' + ');
 
     dom.overlay.hidden = false;
-    flashCueMark();
-    dom.btnKeepSwiping.focus();
+    playMatchSequence();
+    // Fokus erst nach dem Auftritt setzen, sonst springt die Seite.
+    setTimeout(() => dom.btnKeepSwiping.focus({ preventScroll: true }), 480);
   }
 
   function closeMatchOverlay(goToResults) {
@@ -955,15 +981,82 @@
     showMatchOverlay(match);
   }
 
+  let sheetHideTimer = null;
+
+  /**
+   * Blendet die Matches-Liste ein und aus.
+   *
+   * Beim Schließen wird erst hinausgeglitten und danach ausgeblendet – würde
+   * man sofort `hidden` setzen, verschwände die Fläche schlagartig.
+   */
   function toggleMatchesPanel(open) {
-    dom.matchesPanel.hidden = !open;
-    dom.drawerBackdrop.hidden = !open;
-    dom.matchesPanel.setAttribute('aria-hidden', String(!open));
-    // Erst nach dem Einblenden animieren.
-    window.requestAnimationFrame(() => {
-      dom.matchesPanel.dataset.open = String(open);
+    clearTimeout(sheetHideTimer);
+
+    if (open) {
+      dom.matchesPanel.hidden = false;
+      dom.drawerBackdrop.hidden = false;
+      dom.matchesPanel.setAttribute('aria-hidden', 'false');
+      dom.matchesPanel.style.transform = '';
+      // Erst nach dem Einblenden animieren, sonst springt es ohne Bewegung auf.
+      window.requestAnimationFrame(() => {
+        dom.matchesPanel.dataset.open = 'true';
+      });
+      dom.btnCloseMatches.focus({ preventScroll: true });
+      return;
+    }
+
+    dom.matchesPanel.dataset.open = 'false';
+    dom.matchesPanel.setAttribute('aria-hidden', 'true');
+    dom.drawerBackdrop.hidden = true;
+    sheetHideTimer = setTimeout(() => {
+      dom.matchesPanel.hidden = true;
+      dom.matchesPanel.style.transform = '';
+    }, 430);
+  }
+
+  /**
+   * Das Sheet lässt sich am Griff nach unten wegwischen – auf dem Handy die
+   * erwartete Geste. Nach oben gummiert es, statt sich ziehen zu lassen.
+   */
+  function attachSheetGesture() {
+    const grabber = dom.drawerGrabber;
+    if (!grabber) return;
+
+    let pointerId = null;
+    let startY = 0;
+    let dy = 0;
+
+    grabber.addEventListener('pointerdown', (event) => {
+      if (pointerId !== null || event.button !== 0) return;
+      pointerId = event.pointerId;
+      startY = event.clientY;
+      dy = 0;
+      dom.matchesPanel.dataset.dragging = 'true';
+      grabber.setPointerCapture(pointerId);
     });
-    if (open) dom.btnCloseMatches.focus();
+
+    grabber.addEventListener('pointermove', (event) => {
+      if (event.pointerId !== pointerId) return;
+      dy = event.clientY - startY;
+      const offset = dy < 0 ? dy * 0.16 : dy;
+      dom.matchesPanel.style.transform = `translateY(${offset.toFixed(1)}px)`;
+    });
+
+    function finish(event) {
+      if (event.pointerId !== pointerId) return;
+      if (grabber.hasPointerCapture(pointerId)) grabber.releasePointerCapture(pointerId);
+      pointerId = null;
+      dom.matchesPanel.dataset.dragging = 'false';
+
+      if (dy > 90) {
+        toggleMatchesPanel(false);
+      } else {
+        dom.matchesPanel.style.transform = '';
+      }
+    }
+
+    grabber.addEventListener('pointerup', finish);
+    grabber.addEventListener('pointercancel', finish);
   }
 
   /* ======================================================================
@@ -1277,6 +1370,7 @@
 
     // --- Matches ---
     dom.btnOpenMatches.addEventListener('click', () => toggleMatchesPanel(true));
+    attachSheetGesture();
     dom.btnCloseMatches.addEventListener('click', () => toggleMatchesPanel(false));
     dom.drawerBackdrop.addEventListener('click', () => toggleMatchesPanel(false));
 
