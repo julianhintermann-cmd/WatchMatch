@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0b12" />
+    <meta
+      name="description"
+      content="WatchMatch – swipt gemeinsam durch Filme und findet heraus, was ihr heute Abend sehen wollt."
+    />
+    <title>WatchMatch – Find a movie. Match together.</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Zum Inhalt springen</a>
+
+    <!-- ================= Kopfbereich / Raumstatus ================= -->
+    <header class="topbar">
+      <div class="topbar__inner">
+        <a class="brand" href="/" aria-label="WatchMatch Startseite">
+          <span class="brand__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+              <path
+                d="M12 21s-7.5-4.6-9.6-9A5.4 5.4 0 0 1 12 6.2 5.4 5.4 0 0 1 21.6 12c-2.1 4.4-9.6 9-9.6 9z"
+                fill="currentColor"
+              />
+            </svg>
+          </span>
+          <span class="brand__text">WATCHMATCH</span>
+        </a>
+
+        <div class="topbar__status" id="room-status" hidden>
+          <span class="status-dot" id="connection-dot" data-state="online" aria-hidden="true"></span>
+          <span class="status-text status-text--connection" id="connection-text" role="status">
+            Verbunden
+          </span>
+          <span class="status-sep" aria-hidden="true">·</span>
+          <span class="status-text">
+            <span id="people-count">0 Personen</span><span class="long-label"> im Raum</span>
+          </span>
+          <span class="status-sep" aria-hidden="true">·</span>
+          <span class="room-chip">
+            <span class="long-label">Raum: </span><span id="room-code-chip">–</span>
+          </span>
+        </div>
+
+        <button
+          class="btn btn--ghost btn--small"
+          id="btn-leave"
+          type="button"
+          aria-label="Raum verlassen"
+          hidden
+        >
+          Verlassen
+        </button>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ================= Landingpage ================= -->
+      <section class="view view--home" id="view-home" aria-labelledby="home-title">
+        <div class="hero">
+          <p class="hero__eyebrow">Gemeinsam Filme finden</p>
+          <h1 class="hero__title" id="home-title">
+            <span>Find a movie.</span>
+            <span class="hero__title-accent">Match together.</span>
+            <span>Watch tonight.</span>
+          </h1>
+          <p class="hero__subtitle">
+            Swipe gemeinsam durch Filme und findet heraus, was ihr beide sehen wollt.
+          </p>
+
+          <div class="hero__actions">
+            <button class="btn btn--primary btn--large" id="btn-create-room" type="button">
+              Raum erstellen
+            </button>
+            <button class="btn btn--secondary btn--large" id="btn-show-join" type="button">
+              Raum beitreten
+            </button>
+          </div>
+
+          <form class="join-form" id="join-form" hidden>
+            <label class="join-form__label" for="input-room-code">Raum-Code eingeben</label>
+            <div class="join-form__row">
+              <input
+                class="input input--code"
+                id="input-room-code"
+                name="code"
+                type="text"
+                inputmode="text"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                maxlength="8"
+                placeholder="WM8K"
+                aria-describedby="join-form-hint"
+              />
+              <button class="btn btn--primary" id="btn-join-room" type="submit">Beitreten</button>
+            </div>
+            <p class="join-form__hint" id="join-form-hint">
+              Den Code bekommst du von der Person, die den Raum erstellt hat.
+            </p>
+          </form>
+        </div>
+
+        <ul class="feature-grid">
+          <li class="feature">
+            <span class="feature__icon" aria-hidden="true">🎬</span>
+            <h2 class="feature__title">Gemeinsame Auswahl</h2>
+            <p class="feature__text">Alle im Raum sehen dieselben Filme in derselben Reihenfolge.</p>
+          </li>
+          <li class="feature">
+            <span class="feature__icon" aria-hidden="true">👆</span>
+            <h2 class="feature__title">Swipen statt streiten</h2>
+            <p class="feature__text">Rechts für Like, links für Pass – am Handy oder am Desktop.</p>
+          </li>
+          <li class="feature">
+            <span class="feature__icon" aria-hidden="true">⚡</span>
+            <h2 class="feature__title">Match in Echtzeit</h2>
+            <p class="feature__text">
+              Sobald zwei denselben Film mögen, erscheint das Match auf allen Geräten.
+            </p>
+          </li>
+        </ul>
+      </section>
+
+      <!-- ================= Lobby ================= -->
+      <section class="view view--lobby" id="view-lobby" aria-labelledby="lobby-title" hidden>
+        <div class="panel panel--invite">
+          <h1 class="panel__title" id="lobby-title">Ladet eure Leute ein</h1>
+          <p class="panel__subtitle">
+            Teilt den Code oder den Link. Sobald alle da sind, startet der Host die Runde.
+          </p>
+
+          <div class="code-display">
+            <span class="code-display__label">Raum-Code</span>
+            <strong class="code-display__value" id="lobby-room-code">–</strong>
+          </div>
+
+          <div class="invite-actions">
+            <button class="btn btn--secondary" id="btn-copy-code" type="button">Code kopieren</button>
+            <button class="btn btn--secondary" id="btn-copy-link" type="button">Link kopieren</button>
+            <button class="btn btn--secondary" id="btn-share" type="button" hidden>Teilen</button>
+          </div>
+
+          <p class="invite-link" id="invite-link" title="Raum-Link"></p>
+        </div>
+
+        <div class="panel">
+          <h2 class="panel__title panel__title--small">
+            Teilnehmer <span class="pill" id="lobby-user-count">0/8</span>
+          </h2>
+          <ul class="user-list" id="lobby-users"></ul>
+        </div>
+
+        <div class="panel">
+          <h2 class="panel__title panel__title--small">Filter</h2>
+          <p class="panel__subtitle" id="filter-hint">Nur der Host kann die Filter ändern.</p>
+
+          <div class="filters" id="filters">
+            <div class="field">
+              <label class="field__label" for="filter-genre">Genre</label>
+              <select class="input" id="filter-genre">
+                <option value="">Alle Genres</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="filter-rating">
+                Mindestbewertung: <span class="field__value" id="filter-rating-value">0.0</span>
+              </label>
+              <input
+                class="slider"
+                id="filter-rating"
+                type="range"
+                min="0"
+                max="10"
+                step="0.1"
+                value="0"
+              />
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="filter-year">Erscheinungsjahr</label>
+              <select class="input" id="filter-year">
+                <option value="all">Alle</option>
+                <option value="last5">Letzte 5 Jahre</option>
+                <option value="last10">Letzte 10 Jahre</option>
+                <option value="since2000">Seit 2000</option>
+                <option value="since1990">Seit 1990</option>
+                <option value="custom">Benutzerdefiniert</option>
+              </select>
+            </div>
+
+            <div class="field field--inline" id="custom-year-fields" hidden>
+              <div>
+                <label class="field__label" for="filter-year-from">Von</label>
+                <input class="input" id="filter-year-from" type="number" min="1888" step="1" />
+              </div>
+              <div>
+                <label class="field__label" for="filter-year-to">Bis</label>
+                <input class="input" id="filter-year-to" type="number" min="1888" step="1" />
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn--primary btn--large btn--block" id="btn-start" type="button">
+            Filmrunde starten
+          </button>
+          <p class="panel__note" id="start-note">Warte, bis der Host die Runde startet.</p>
+        </div>
+      </section>
+
+      <!-- ================= Swipe-Ansicht ================= -->
+      <section class="view view--swipe" id="view-swipe" aria-labelledby="swipe-title" hidden>
+        <h1 class="visually-hidden" id="swipe-title">Filme bewerten</h1>
+
+        <div class="swipe-progress">
+          <div class="swipe-progress__text">
+            <strong id="my-progress">Du: 0 / 0</strong>
+            <button class="btn btn--ghost btn--small" id="btn-open-matches" type="button">
+              Matches <span class="pill pill--accent" id="match-count">0</span>
+            </button>
+          </div>
+          <div
+            class="progressbar"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+            aria-label="Dein Fortschritt"
+            id="progressbar"
+          >
+            <span class="progressbar__fill" id="progressbar-fill"></span>
+          </div>
+          <ul class="peer-progress" id="peer-progress"></ul>
+        </div>
+
+        <div class="stack-wrapper">
+          <div class="stack" id="card-stack"></div>
+
+          <div class="stack-empty" id="stack-loading" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            <p>Filme werden geladen …</p>
+          </div>
+        </div>
+
+        <p class="visually-hidden" id="card-announcer" aria-live="polite"></p>
+
+        <div class="swipe-actions">
+          <button class="action action--pass" id="btn-pass" type="button" aria-label="Film ablehnen (Pass)">
+            <span aria-hidden="true">✕</span>
+          </button>
+          <button class="action action--info" id="btn-details" type="button" aria-label="Beschreibung ein- oder ausblenden">
+            <span aria-hidden="true">ℹ</span>
+          </button>
+          <button class="action action--like" id="btn-like" type="button" aria-label="Film mögen (Like)">
+            <span aria-hidden="true">❤</span>
+          </button>
+        </div>
+
+        <p class="keyboard-hint">
+          <kbd>←</kbd> Pass · <kbd>→</kbd> Like · oder <kbd>A</kbd> / <kbd>D</kbd>
+        </p>
+      </section>
+
+      <!-- ================= Ergebnis-Ansicht ================= -->
+      <section class="view view--done" id="view-done" aria-labelledby="done-title" hidden>
+        <div class="panel panel--center">
+          <span class="done__icon" aria-hidden="true">🍿</span>
+          <h1 class="panel__title" id="done-title">Du bist durch!</h1>
+          <p class="panel__subtitle" id="done-subtitle">
+            Warte kurz, bis die anderen fertig sind – Matches erscheinen weiterhin sofort.
+          </p>
+
+          <h2 class="panel__title panel__title--small">Unsere Matches</h2>
+          <ul class="match-list" id="done-matches">
+            <li class="match-list__empty">Noch keine Matches.</li>
+          </ul>
+
+          <div class="done__actions">
+            <button class="btn btn--primary" id="btn-new-round" type="button" hidden>
+              Neue Runde starten
+            </button>
+            <button class="btn btn--secondary" id="btn-back-to-swipe" type="button" hidden>
+              Zurück zum Stapel
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= Matches-Panel ================= -->
+    <aside
+      class="drawer"
+      id="matches-panel"
+      aria-labelledby="matches-panel-title"
+      aria-hidden="true"
+      hidden
+    >
+      <div class="drawer__head">
+        <h2 class="drawer__title" id="matches-panel-title">Unsere Matches</h2>
+        <button class="icon-btn" id="btn-close-matches" type="button" aria-label="Matches schließen">
+          <span aria-hidden="true">✕</span>
+        </button>
+      </div>
+      <ul class="match-list" id="matches-list">
+        <li class="match-list__empty">Noch keine Matches.</li>
+      </ul>
+    </aside>
+    <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+
+    <!-- ================= Match-Overlay ================= -->
+    <div
+      class="overlay"
+      id="match-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="overlay-title"
+      hidden
+    >
+      <div class="confetti" id="confetti" aria-hidden="true"></div>
+      <div class="overlay__card" role="document">
+        <p class="overlay__kicker" id="overlay-title">
+          <span aria-hidden="true">🎉</span>
+          <span class="overlay__kicker-text">IT'S A MATCH!</span>
+          <span aria-hidden="true">🎉</span>
+        </p>
+        <p class="overlay__lead">Ihr wollt beide:</p>
+
+        <div class="overlay__poster">
+          <img id="overlay-poster" alt="" decoding="async" />
+        </div>
+
+        <h2 class="overlay__movie" id="overlay-movie-title">–</h2>
+        <p class="overlay__lead">sehen!</p>
+
+        <p class="overlay__meta" id="overlay-movie-meta"></p>
+        <p class="overlay__overview" id="overlay-movie-overview"></p>
+        <p class="overlay__liked-by" id="overlay-liked-by"></p>
+
+        <div class="overlay__actions">
+          <button class="btn btn--primary" id="btn-keep-swiping" type="button">Weiter swipen</button>
+          <button class="btn btn--secondary" id="btn-stop-swiping" type="button">
+            Auswahl beenden
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= Toasts ================= -->
+    <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+    <!-- ================= Templates ================= -->
+    <template id="tpl-card">
+      <article class="card">
+        <div class="card__media">
+          <img class="card__img" alt="" decoding="async" />
+          <div class="card__placeholder" aria-hidden="true"><span></span></div>
+        </div>
+        <div class="card__scrim" aria-hidden="true"></div>
+        <div class="card__stamp card__stamp--like" aria-hidden="true">LIKE</div>
+        <div class="card__stamp card__stamp--pass" aria-hidden="true">PASS</div>
+        <div class="card__body">
+          <h3 class="card__title"></h3>
+          <p class="card__meta">
+            <span class="card__rating"></span>
+            <span class="card__year"></span>
+            <span class="card__runtime"></span>
+          </p>
+          <p class="card__genres"></p>
+          <p class="card__overview"></p>
+        </div>
+      </article>
+    </template>
+
+    <template id="tpl-user">
+      <li class="user-list__item">
+        <span class="user-list__avatar" aria-hidden="true"></span>
+        <span class="user-list__name"></span>
+        <span class="user-list__tags"></span>
+      </li>
+    </template>
+
+    <template id="tpl-match">
+      <li class="match-list__item">
+        <img class="match-list__poster" alt="" decoding="async" />
+        <div class="match-list__info">
+          <strong class="match-list__title"></strong>
+          <span class="match-list__meta"></span>
+        </div>
+      </li>
+    </template>
+
+    <template id="tpl-peer">
+      <li class="peer-progress__item">
+        <span class="peer-progress__name"></span>
+        <span class="peer-progress__value"></span>
+      </li>
+    </template>
+
+    <template id="tpl-toast">
+      <div class="toast"><span class="toast__text"></span></div>
+    </template>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

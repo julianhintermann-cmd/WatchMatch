@@ -1,0 +1,23 @@
+# Abhängigkeiten
+node_modules/
+
+# Umgebung (enthält Secrets – niemals committen!)
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Betriebssystem / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Sonstiges
+coverage/
+*.tgz

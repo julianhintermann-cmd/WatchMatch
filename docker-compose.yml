@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+# WatchMatch – Docker Compose
+#
+# Schnellstart:
+#     cp .env.example .env
+#     docker compose up -d
+#     -> http://localhost:3000
+#
+# `build: .` sorgt dafür, dass das Image beim ersten Start lokal gebaut wird.
+# Wer stattdessen das über GitHub Actions veröffentlichte Image nutzen möchte,
+# entfernt den `build`-Block und führt `docker compose pull` aus.
+#
+# EINZIGER WERT, DER ANGEPASST WERDEN MUSS:
+#     YOUR_GITHUB_USERNAME  ->  euer GitHub-Benutzer- bzw. Organisationsname
+#     (muss kleingeschrieben sein, so verlangt es die GitHub Container Registry)
+# ---------------------------------------------------------------------------
+
+services:
+  watchmatch:
+    image: ghcr.io/YOUR_GITHUB_USERNAME/watchmatch:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: watchmatch
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Leer lassen -> die App nutzt die mitgelieferten Fallback-Filme.
+      # Compose liest den Wert automatisch aus der .env-Datei im Projektordner.
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
