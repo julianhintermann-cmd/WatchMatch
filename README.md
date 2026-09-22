@@ -20,7 +20,7 @@ Raum erstellen → Raum teilen → Beitreten → Gemeinsame Filmliste
 - [Entwicklung](#entwicklung)
 - [Docker](#docker)
 - [Docker Compose](#docker-compose)
-- [GitHub Container Registry](#github-container-registry)
+- [Docker Hub und GitHub Actions](#docker-hub-und-github-actions)
 - [TMDB-Anbindung](#tmdb-anbindung)
 - [Gestaltung](#gestaltung)
 - [Konfiguration](#konfiguration)
@@ -123,50 +123,89 @@ docker compose logs -f      # Logs ansehen
 docker compose down         # Stoppen
 ```
 
-> **Einziger Wert, der bewusst angepasst werden muss:**
-> In `docker-compose.yml` steht `ghcr.io/YOUR_GITHUB_USERNAME/watchmatch:latest`.
-> Ersetzt `YOUR_GITHUB_USERNAME` durch euren GitHub-Benutzer- oder
-> Organisationsnamen (**kleingeschrieben** – die GitHub Container Registry
-> akzeptiert nur Kleinbuchstaben).
+So gestartet baut Compose das Image beim ersten Start selbst – es wird also
+kein veröffentlichtes Image gebraucht.
 
-Solange der `build:`-Block in der Datei steht, baut Compose das Image beim
-ersten Start selbst – ihr könnt also auch ohne veröffentlichtes Image starten.
-Wer stattdessen das fertige Image aus der Registry ziehen möchte, entfernt den
-`build:`-Block und nutzt `docker compose pull && docker compose up -d`.
+Wer stattdessen das fertige Image von Docker Hub ziehen möchte, trägt in der
+`.env` den Benutzernamen ein:
 
-## GitHub Container Registry
+```env
+DOCKERHUB_USERNAME=euer-dockerhub-name
+```
 
-Der Workflow `.github/workflows/docker-build.yml` läuft
+```bash
+docker compose pull
+docker compose up -d
+```
 
-- bei jedem Push auf `main`,
-- bei Tags der Form `v1.2.3`,
-- bei Pull Requests (nur bauen, nicht veröffentlichen),
-- und manuell über **Actions → Docker Build & Push → Run workflow**.
+In `docker-compose.yml` selbst muss dafür nichts geändert werden – der
+Image-Name wird aus dieser Variablen zusammengesetzt. Ohne gesetzten Wert
+heißt das lokal gebaute Image `watchmatch-local/watchmatch:latest`.
 
-Er führt zuerst die Tests aus, baut anschließend mit Docker Buildx und pusht
-nach GHCR. Dabei wird ausschließlich das automatisch bereitgestellte
-`GITHUB_TOKEN` verwendet – es ist **kein** persönlicher Access Token nötig.
+## Docker Hub und GitHub Actions
 
-Veröffentlichte Tags:
+Der Workflow `.github/workflows/docker-build.yml` führt zuerst die Tests aus,
+baut anschließend mit Docker Buildx und veröffentlicht auf Docker Hub.
+
+**Zugangsdaten** kommen aus den Repository-Secrets und stehen nirgends im
+Quelltext. Anzulegen unter *Settings → Secrets and variables → Actions*:
+
+| Name | Inhalt |
+| --- | --- |
+| `DOCKERHUB_USERNAME` | Docker-Hub-Benutzername |
+| `DOCKERHUB_TOKEN` | Access Token mit Berechtigung **Read & Write** ([Docker Hub → Account settings → Personal access tokens](https://app.docker.com/settings/personal-access-tokens)) |
+
+Der Benutzername darf statt als Secret auch als *Variable* hinterlegt sein.
+Der Workflow akzeptiert beides. Als Variable erscheint er unmaskiert im Log,
+was die Fehlersuche erleichtert – öffentlich ist er ohnehin, er steht im
+Image-Namen. Der Token gehört immer in die Secrets.
+
+**Wann gebaut und wann veröffentlicht wird**
+
+| Auslöser | Verhalten |
+| --- | --- |
+| Push auf den Default-Branch | Tests, Build, Push |
+| Push eines Tags `v1.2.3` | Tests, Build, Push |
+| Push auf jeden anderen Branch | Tests und Build, **kein** Push |
+| Manueller Start (*Actions → Run workflow*) | Tests, Build, Push |
+
+Dass auch Nebenbranches gebaut werden, ist Absicht: So fällt ein kaputtes
+Dockerfile auf, bevor es auf dem Hauptbranch landet – ohne die Registry zu
+berühren.
+
+**Veröffentlichte Tags**
 
 | Tag | Wann |
 | --- | --- |
 | `latest` | Push auf den Default-Branch |
-| `sha-<commit>` | bei jedem Build |
-| `<branchname>` | Push auf einen Branch |
-| `1.2.3` | Git-Tag `v1.2.3` |
+| `sha-<commit>` | bei jedem Push |
+| `<branchname>` | Push auf einen Branch (Schrägstriche werden zu `-`) |
+| `1.2.3` und `1.2` | Git-Tag `v1.2.3` |
 
 Image ziehen:
 
 ```bash
-docker pull ghcr.io/<euer-benutzername>/watchmatch:latest
+docker pull euer-dockerhub-name/watchmatch:latest
 ```
 
-Damit der Push gelingt, muss im Repository unter
-**Settings → Actions → General → Workflow permissions** die Option
-*Read and write permissions* aktiv sein. Neu erstellte Pakete sind zunächst
-privat; öffentlich macht ihr sie unter **Packages → watchmatch → Package
-settings → Change visibility**.
+**Falls der Lauf scheitert**
+
+| Meldung | Ursache |
+| --- | --- |
+| `Zum Veröffentlichen fehlen Zugangsdaten` | Secret fehlt oder heißt anders – der Workflow erwartet exakt `DOCKERHUB_USERNAME` und `DOCKERHUB_TOKEN` |
+| `denied: requested access to the resource is denied` | Token hat nur Leserechte, oder der Benutzername passt nicht zum Token |
+| `repository does not exist` | Das Repository auf Docker Hub vorher anlegen – nicht jedes Konto erlaubt automatisches Anlegen beim ersten Push |
+
+**Nur für amd64.** Der Build erzeugt bewusst ein einzelnes Image für
+`linux/amd64`. Wer das Image auf einem Raspberry Pi oder Apple Silicon nativ
+betreiben will, ergänzt im Schritt *Image bauen und pushen*:
+
+```yaml
+          platforms: linux/amd64,linux/arm64
+```
+
+und davor `- uses: docker/setup-qemu-action@v3`. Das verdoppelt ungefähr die
+Bauzeit.
 
 ## TMDB-Anbindung
 
