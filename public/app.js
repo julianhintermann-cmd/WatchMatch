@@ -42,7 +42,7 @@
   }
 
   function formatRating(rating) {
-    return typeof rating === 'number' && rating > 0 ? `⭐ ${rating.toFixed(1)}` : '';
+    return typeof rating === 'number' && rating > 0 ? `${rating.toFixed(1)}/10` : '';
   }
 
   function debounce(fn, delay) {
@@ -180,8 +180,8 @@
     startNote: $('start-note'),
 
     myProgress: $('my-progress'),
-    progressbar: $('progressbar'),
-    progressbarFill: $('progressbar-fill'),
+    reel: $('reel'),
+    heroReel: $('hero-reel'),
     peerProgress: $('peer-progress'),
     cardStack: $('card-stack'),
     stackLoading: $('stack-loading'),
@@ -203,7 +203,6 @@
     drawerBackdrop: $('drawer-backdrop'),
 
     overlay: $('match-overlay'),
-    confetti: $('confetti'),
     overlayPoster: $('overlay-poster'),
     overlayTitle: $('overlay-movie-title'),
     overlayMeta: $('overlay-movie-meta'),
@@ -315,16 +314,31 @@
     dom.lobbyUserCount.textContent = `${room.users.length}/${room.maxUsers}`;
 
     dom.lobbyUsers.replaceChildren();
-    room.users.forEach((user) => {
+    room.users.forEach((user, index) => {
       const node = dom.tplUser.content.firstElementChild.cloneNode(true);
-      node.querySelector('.user-list__avatar').textContent = user.name.replace(/[^0-9]/g, '') || '?';
-      node.querySelector('.user-list__name').textContent = user.name;
+      node.querySelector('.seat__no').textContent = String(index + 1).padStart(2, '0');
+      node.querySelector('.seat__name').textContent = user.name;
+      if (!user.connected) node.classList.add('seat--offline');
 
-      const tags = [];
-      if (user.isHost) tags.push('👑 Host');
-      if (user.id === (state.session && state.session.userId)) tags.push('Du');
-      if (!user.connected) tags.push('offline');
-      node.querySelector('.user-list__tags').textContent = tags.join(' · ');
+      // Rollen als Textmarken statt Emojis.
+      const tags = node.querySelector('.seat__tags');
+      tags.replaceChildren();
+      if (user.isHost) {
+        const host = document.createElement('span');
+        host.className = 'is-host';
+        host.textContent = 'Host';
+        tags.appendChild(host);
+      }
+      if (user.id === (state.session && state.session.userId)) {
+        const you = document.createElement('span');
+        you.textContent = 'Du';
+        tags.appendChild(you);
+      }
+      if (!user.connected) {
+        const off = document.createElement('span');
+        off.textContent = 'offline';
+        tags.appendChild(off);
+      }
 
       dom.lobbyUsers.appendChild(node);
     });
@@ -345,25 +359,74 @@
       : 'Warte, bis der Host die Runde startet.';
   }
 
+  /**
+   * Zeichnet die Rolle: ein Kader je Film. Der Streifen zeigt nicht nur den
+   * Fortschritt, sondern auch das eigene Urteil und die Fundstellen der
+   * Matches – Information, die ein Fortschrittsbalken nicht transportiert.
+   */
+  function renderReel() {
+    const total = state.movies.length;
+    if (total === 0) {
+      dom.reel.replaceChildren();
+      return;
+    }
+
+    // Kader nur neu aufbauen, wenn sich die Rundenlänge geändert hat.
+    if (dom.reel.childElementCount !== total) {
+      const frames = [];
+      for (let index = 0; index < total; index += 1) {
+        const frame = document.createElement('span');
+        frame.className = 'reel__frame';
+        frames.push(frame);
+      }
+      dom.reel.replaceChildren(...frames);
+    }
+
+    const matched = new Set(
+      state.room ? state.room.matches.map((match) => match.movieId) : [],
+    );
+    const current = state.queue.length > 0 ? state.queue[0].id : null;
+
+    state.movies.forEach((movie, index) => {
+      const frame = dom.reel.children[index];
+      if (!frame) return;
+
+      const verdict = state.mySwipes[movie.id];
+      let mark = '';
+      if (matched.has(movie.id)) mark = 'match';
+      else if (verdict === 'like') mark = 'keep';
+      else if (verdict === 'pass') mark = 'pass';
+      if (mark) frame.dataset.state = mark;
+      else frame.removeAttribute('data-state');
+
+      // Der Abspielkopf ist eine eigene Markierung – sonst verschwindet er,
+      // sobald der aktuelle Film bereits ein Match ist.
+      if (movie.id === current) frame.dataset.now = 'true';
+      else frame.removeAttribute('data-now');
+    });
+  }
+
   function renderProgress() {
     if (!state.room) return;
     const total = state.movies.length || state.room.movieCount || 0;
     const me = myUser();
     const mine = me ? me.swipes : 0;
 
-    dom.myProgress.textContent = `Du: ${mine} / ${total}`;
-    const percent = total > 0 ? Math.round((mine / total) * 100) : 0;
-    dom.progressbarFill.style.width = `${percent}%`;
-    dom.progressbar.setAttribute('aria-valuenow', String(percent));
+    dom.myProgress.textContent = `Du ${mine}/${total}`;
+    dom.reel.setAttribute(
+      'aria-valuenow',
+      String(total > 0 ? Math.round((mine / total) * 100) : 0),
+    );
+    renderReel();
 
     dom.peerProgress.replaceChildren();
     state.room.users
       .filter((user) => !state.session || user.id !== state.session.userId)
       .forEach((user) => {
         const node = dom.tplPeer.content.firstElementChild.cloneNode(true);
-        node.querySelector('.peer-progress__name').textContent = `${user.name}:`;
-        node.querySelector('.peer-progress__value').textContent = `${user.swipes} / ${total}`;
-        if (!user.connected) node.style.opacity = '0.5';
+        node.querySelector('.peer__name').textContent = user.name;
+        node.querySelector('.peer__value').textContent = `${user.swipes}/${total}`;
+        if (!user.connected) node.classList.add('peer--offline');
         dom.peerProgress.appendChild(node);
       });
   }
@@ -373,8 +436,8 @@
 
     if (!matches || matches.length === 0) {
       const empty = document.createElement('li');
-      empty.className = 'match-list__empty';
-      empty.textContent = 'Noch keine Matches.';
+      empty.className = 'matches__empty';
+      empty.textContent = 'Noch kein Match. Zwei gleiche Likes genügen.';
       listElement.appendChild(empty);
       return;
     }
@@ -385,7 +448,7 @@
       .forEach((match) => {
         const movie = match.movie;
         const node = dom.tplMatch.content.firstElementChild.cloneNode(true);
-        const poster = node.querySelector('.match-list__poster');
+        const poster = node.querySelector('.match__poster');
         const url = safeImageUrl(movie.posterUrl);
         if (url) {
           poster.src = url;
@@ -393,14 +456,14 @@
         } else {
           poster.remove();
         }
-        node.querySelector('.match-list__title').textContent = movie.title;
-        node.querySelector('.match-list__meta').textContent = [
+        node.querySelector('.match__title').textContent = movie.title;
+        node.querySelector('.match__meta').textContent = [
           formatRating(movie.rating),
           movie.year || '',
-          (movie.genres || []).join(' · '),
+          (movie.genres || []).slice(0, 2).join(' · '),
         ]
           .filter(Boolean)
-          .join('  ·  ');
+          .join(' · ');
         listElement.appendChild(node);
       });
   }
@@ -408,6 +471,7 @@
   function renderMatches() {
     const matches = state.room ? state.room.matches : [];
     dom.matchCount.textContent = String(matches.length);
+    dom.matchCount.dataset.empty = String(matches.length === 0);
     renderMatchList(dom.matchesList, matches);
     renderMatchList(dom.doneMatches, matches);
   }
@@ -564,10 +628,18 @@
     state.queue = state.movies.filter((movie) => !state.mySwipes[movie.id]);
   }
 
-  function buildCard(movie, depth) {
+  function buildCard(movie, depth, position, total) {
     const node = dom.tplCard.content.firstElementChild.cloneNode(true);
     node.dataset.depth = String(depth);
     node.dataset.movieId = movie.id;
+
+    // Randcode wie auf Filmmaterial: Position in der Rolle und Jahr.
+    node.querySelector('.card__edgecode').textContent = [
+      `${String(position).padStart(2, '0')}/${total}`,
+      movie.year || '',
+    ]
+      .filter(Boolean)
+      .join('  ');
 
     const image = node.querySelector('.card__img');
     const placeholder = node.querySelector('.card__placeholder');
@@ -602,9 +674,11 @@
     dom.cardStack.replaceChildren();
 
     const visible = state.queue.slice(0, VISIBLE_CARDS);
+    const total = state.movies.length;
+    const firstPosition = total - state.queue.length + 1;
     // Rückwärts einfügen, damit der erste Film oben liegt.
     for (let index = visible.length - 1; index >= 0; index -= 1) {
-      dom.cardStack.appendChild(buildCard(visible[index], index));
+      dom.cardStack.appendChild(buildCard(visible[index], index, firstPosition + index, total));
     }
 
     const hasCards = visible.length > 0;
@@ -614,8 +688,7 @@
     dom.btnDetails.disabled = !hasCards;
 
     if (hasCards) {
-      const position = state.movies.length - state.queue.length + 1;
-      dom.cardAnnouncer.textContent = `Film ${position} von ${state.movies.length}: ${visible[0].title}`;
+      dom.cardAnnouncer.textContent = `Film ${firstPosition} von ${total}: ${visible[0].title}`;
       attachGestures(topCard());
     }
   }
@@ -639,17 +712,21 @@
     card.style.transform = `translate(${dx}px, ${dy * 0.35}px) rotate(${rotation}deg)`;
 
     const intensity = clamp(Math.abs(dx) / threshold, 0, 1);
-    const like = card.querySelector('.card__stamp--like');
-    const pass = card.querySelector('.card__stamp--pass');
-    like.style.opacity = dx > 0 ? String(intensity) : '0';
+    const keep = card.querySelector('.card__mark--keep');
+    const pass = card.querySelector('.card__mark--pass');
+    keep.style.opacity = dx > 0 ? String(intensity) : '0';
     pass.style.opacity = dx < 0 ? String(intensity) : '0';
+    // Die Markierung wächst mit der Ziehdistanz.
+    const scale = 0.8 + intensity * 0.2;
+    keep.style.transform = `scale(${scale})`;
+    pass.style.transform = `scale(${scale})`;
   }
 
   function resetCardPosition(card) {
     card.classList.add('card--animated');
     card.style.transform = '';
-    card.querySelector('.card__stamp--like').style.opacity = '0';
-    card.querySelector('.card__stamp--pass').style.opacity = '0';
+    card.querySelector('.card__mark--keep').style.opacity = '0';
+    card.querySelector('.card__mark--pass').style.opacity = '0';
     setTimeout(() => card.classList.remove('card--animated'), 320);
   }
 
@@ -657,9 +734,9 @@
   function flyOut(card, direction) {
     const offset = (direction === 'right' ? 1 : -1) * (window.innerWidth + 260);
     card.classList.add('card--animated');
-    card.style.transform = `translate(${offset}px, -40px) rotate(${direction === 'right' ? 28 : -28}deg)`;
+    card.style.transform = `translate(${offset}px, -40px) rotate(${direction === 'right' ? 22 : -22}deg)`;
     card.style.opacity = '0';
-    card.querySelector(`.card__stamp--${direction === 'right' ? 'like' : 'pass'}`).style.opacity = '1';
+    card.querySelector(`.card__mark--${direction === 'right' ? 'keep' : 'pass'}`).style.opacity = '1';
   }
 
   function attachGestures(card) {
@@ -791,23 +868,16 @@
      9. Matches & Overlay
      ====================================================================== */
 
-  const CONFETTI_COLORS = ['#ff3d71', '#7c5cff', '#1fd18a', '#ffd166', '#38bdf8'];
-
-  function launchConfetti() {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    dom.confetti.replaceChildren();
-
-    for (let index = 0; index < 70; index += 1) {
-      const piece = document.createElement('span');
-      piece.className = 'confetti__piece';
-      piece.style.left = `${Math.random() * 100}%`;
-      piece.style.background = CONFETTI_COLORS[index % CONFETTI_COLORS.length];
-      piece.style.animationDuration = `${1.8 + Math.random() * 1.6}s`;
-      piece.style.animationDelay = `${Math.random() * 0.5}s`;
-      piece.style.width = `${6 + Math.random() * 6}px`;
-      dom.confetti.appendChild(piece);
-    }
-    setTimeout(() => dom.confetti.replaceChildren(), 4200);
+  /**
+   * Startet die Überblendzeichen-Animation neu. Im Kino kündigt dieser Kreis
+   * oben rechts im Bild den Rollenwechsel an – hier den Match.
+   */
+  function flashCueMark() {
+    const cue = dom.overlay.querySelector('.cue');
+    if (!cue) return;
+    cue.style.animation = 'none';
+    void cue.offsetWidth; // Reflow erzwingen, sonst läuft die Animation nicht erneut
+    cue.style.animation = '';
   }
 
   function showMatchOverlay(match) {
@@ -829,17 +899,16 @@
       .filter(Boolean)
       .join('  ·  ');
     dom.overlayOverview.textContent = movie.overview || '';
-    dom.overlayLikedBy.textContent = `Gefällt: ${(match.likedBy || []).join(', ')}`;
+    dom.overlayLikedBy.textContent = (match.likedBy || []).join(' + ');
 
     dom.overlay.hidden = false;
-    launchConfetti();
+    flashCueMark();
     dom.btnKeepSwiping.focus();
   }
 
   function closeMatchOverlay(goToResults) {
     dom.overlay.hidden = true;
     state.overlayOpen = false;
-    dom.confetti.replaceChildren();
 
     if (goToResults) {
       showView('done');
@@ -1221,11 +1290,37 @@
     }
   }
 
+  /**
+   * Füllt den laufenden Filmstreifen auf der Startseite. Die Poster sind die
+   * lokal erzeugten Platzhalter – damit läuft der Streifen auch offline.
+   */
+  const HERO_FRAMES = [10, 43, 18, 3, 35, 6, 27, 52, 39, 17];
+
+  function buildHeroReel() {
+    if (!dom.heroReel) return;
+    const frames = [];
+    // Zweimal dieselbe Folge, damit die Endlosschleife nahtlos umschlägt.
+    for (let pass = 0; pass < 2; pass += 1) {
+      HERO_FRAMES.forEach((id) => {
+        const frame = document.createElement('div');
+        frame.className = 'filmstrip__frame';
+        const image = document.createElement('img');
+        image.src = `/img/poster/${id}.svg`;
+        image.alt = '';
+        image.loading = 'lazy';
+        frame.appendChild(image);
+        frames.push(frame);
+      });
+    }
+    dom.heroReel.replaceChildren(...frames);
+  }
+
   async function init() {
     state.config = await loadConfig();
     populateFilterOptions(state.config);
     setFiltersEnabled(false);
     wireEvents();
+    buildHeroReel();
     showView('home');
 
     const urlCode = roomCodeFromUrl();

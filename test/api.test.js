@@ -115,7 +115,8 @@ test('Security-Header sind gesetzt', async () => {
 test('Die App wird unter / und /room/:code ausgeliefert', async () => {
   const root = await get('/');
   assert.equal(root.status, 200);
-  assert.match(root.body, /WATCHMATCH/);
+  assert.match(root.body, /WatchMatch/i);
+  assert.match(root.body, /id="view-home"/);
 
   const room = await get('/room/WM8K');
   assert.equal(room.status, 200);

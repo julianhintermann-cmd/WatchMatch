@@ -22,6 +22,7 @@ Raum erstellen → Raum teilen → Beitreten → Gemeinsame Filmliste
 - [Docker Compose](#docker-compose)
 - [GitHub Container Registry](#github-container-registry)
 - [TMDB-Anbindung](#tmdb-anbindung)
+- [Gestaltung](#gestaltung)
 - [Konfiguration](#konfiguration)
 - [REST-API](#rest-api)
 - [Socket.IO-Events](#socketio-events)
@@ -41,7 +42,8 @@ Raum erstellen → Raum teilen → Beitreten → Gemeinsame Filmliste
   Reihenfolge kommen ausschließlich vom Server.
 - **Echte Swipe-Gesten** auf Touchgeräten (inklusive LIKE/PASS-Stempel und
   Fly-out-Animation), Buttons und Tastatur (`←`/`→` bzw. `A`/`D`) am Desktop.
-- **Matches in Echtzeit** mit Overlay, Konfetti und gemeinsamer Match-Historie.
+- **Matches in Echtzeit** mit Overlay, Überblendzeichen und gemeinsamer
+  Match-Historie.
 - **Reconnect-sicher**: Nach Verbindungsabbruch oder Reload werden Sitzung,
   Fortschritt und Matches wiederhergestellt.
 - **Funktioniert ohne TMDB-Key** – dann kommen 60 mitgelieferte Filme mit
@@ -188,6 +190,38 @@ lokale Datensatz aus `src/fallback-movies.js` (60 Filme von 1942 bis 2023).
 Die Poster dafür erzeugt der Server selbst als SVG – es werden keine externen
 Bilder geladen. Die App ist dadurch auch komplett offline voll funktionsfähig.
 
+## Gestaltung
+
+Die Oberfläche folgt einer durchgehenden Idee statt einer Sammlung von
+Effekten: **die Apparatur des Kinos**. Das ist keine Dekoration, sondern
+ergibt sich aus dem Datenmodell – alle Teilnehmer laufen durch dieselbe,
+servergenerierte Sequenz von Filmen. Das *ist* eine Filmrolle im Projektor.
+
+| Element | Herkunft |
+| --- | --- |
+| Fortschritt als **Rolle** mit einem Kader je Film | zeigt zusätzlich, was behalten wurde und wo die Matches liegen – das kann ein Balken nicht |
+| Filmkarte als **16-mm-Kader**: einseitig perforiert, mit Randcode | 16-mm-Material ist einseitig perforiert; der Randcode nennt Position in der Rolle und Jahr |
+| **Überblendzeichen** beim Match | der Kreis, der im Kino oben rechts den Rollenwechsel ankündigt – ersetzt Konfetti |
+| Perforation als Trennlinie | statt beliebiger Haarlinien |
+| Markierung beim Ziehen: Kreis behalten, Kreuz weiter | wie Cutter einen Kader von Hand bewerten |
+
+**Farben** stammen aus Filmmaterial statt aus einem Paletten-Generator: warmes
+Fast-Schwarz (abgedunkelter Saal), Academy-Leader-Creme als Schriftfarbe,
+Projektorlampen-Bernstein als Marke, Schneidetisch-Grün für „behalten",
+Überblendzeichen-Rot für „weiter". Alle Textfarben erfüllen mindestens
+WCAG AA auf allen Flächen.
+
+**Schriften** liegen unter `public/fonts/` im Repository – Big Shoulders
+Display (Anzeige), Archivo (Fließtext), Azeret Mono (Daten). Kein Google-Fonts-
+CDN: Die App sieht ohne Internetzugang identisch aus, und die CSP erlaubt nur
+`font-src 'self'`. Alle drei stehen unter der SIL Open Font License 1.1, siehe
+`public/fonts/LICENSE.md`.
+
+Geprüft wurde außerdem: alle Trefferflächen ≥ 44 px, sichtbarer Fokus auf jedem
+Bedienelement, keine Emojis als Icons (durchgehend SVG mit einer Strichstärke),
+kein horizontales Scrollen bei 375 px, im Querformat und bei 22 px Grundschrift,
+und `prefers-reduced-motion` schaltet Bewegung ab.
+
 ## Konfiguration
 
 Alle Werte sind optional, `PORT` und `TMDB_API_KEY` stehen in `.env.example`.
@@ -281,8 +315,9 @@ watchmatch/
 ├── public/
 │   ├── index.html               Single-Page-App
 │   ├── app.js                   Client (Socket, Swipes, Matches, UI)
-│   ├── styles.css               Dark Mode, Mobile First, ohne CDN
-│   └── favicon.svg
+│   ├── styles.css               Gestaltung, Mobile First, ohne CDN
+│   ├── favicon.svg
+│   └── fonts/                   selbst gehostete Schriften (+ LICENSE.md)
 ├── test/
 │   ├── rooms.test.js            Raum- und Match-Logik
 │   ├── api.test.js              REST-Endpunkte und Security-Header

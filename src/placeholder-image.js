@@ -1,11 +1,15 @@
 'use strict';
 
 /**
- * Erzeugt neutrale Poster-/Backdrop-Platzhalter als SVG.
+ * Erzeugt Poster- und Backdrop-Platzhalter als SVG.
  *
- * Damit funktionieren die Fallback-Filme komplett ohne externe Bild-URLs -
- * auch in einem Container ohne Internetzugang. Farben werden deterministisch
- * aus der Film-ID abgeleitet, damit jeder Film immer gleich aussieht.
+ * Damit funktionieren die Fallback-Filme komplett ohne externe Bild-URLs –
+ * auch in einem Container ohne Internetzugang.
+ *
+ * Bewusst ohne Text: Die Filmkarte zeigt Titel, Jahr und Bewertung bereits in
+ * der Typografie der Oberfläche. Ein zweites Mal auf dem Poster wäre eine
+ * Dopplung. Der Platzhalter liefert deshalb nur ein Farbfeld – deterministisch
+ * aus der Film-ID abgeleitet, damit jeder Film seine eigene Farbe behält.
  */
 
 const { FALLBACK_MOVIE_BY_ID } = require('./fallback-movies');
@@ -20,7 +24,7 @@ function hashString(value) {
   return Math.abs(hash);
 }
 
-/** XML-Escaping - verhindert, dass Titel die SVG-Struktur aufbrechen. */
+/** XML-Escaping für das aria-label. */
 function escapeXml(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -30,48 +34,27 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;');
 }
 
-/** Bricht einen Titel in Zeilen mit maximaler Zeichenzahl um. */
-function wrapText(text, maxChars, maxLines) {
-  const words = String(text).split(/\s+/).filter(Boolean);
-  const lines = [];
-  let current = '';
-
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (candidate.length > maxChars && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = candidate;
-    }
-    if (lines.length === maxLines) break;
-  }
-  if (lines.length < maxLines && current) lines.push(current);
-
-  if (lines.length === maxLines && words.join(' ').length > lines.join(' ').length) {
-    const last = lines[maxLines - 1];
-    lines[maxLines - 1] = `${last.slice(0, Math.max(0, maxChars - 1)).trim()}...`;
-  }
-  return lines;
-}
-
+/**
+ * Farbpaare im warmen Dunkel der Oberfläche: gedeckte Tiefen, jeweils ein
+ * kräftigerer Ton darüber. Passt zur Palette der App, ohne sie zu übertönen.
+ */
 function paletteFor(seed) {
   const palettes = [
-    ['#1f2a4d', '#6d28d9'],
-    ['#0f3c4c', '#0ea5a4'],
-    ['#3b1447', '#db2777'],
-    ['#12263a', '#2563eb'],
-    ['#3a1c1c', '#ea580c'],
-    ['#14301f', '#16a34a'],
-    ['#2d1b3d', '#8b5cf6'],
-    ['#1b2735', '#38bdf8'],
+    ['#2a1a10', '#b4561f'], // Kupfer
+    ['#101f22', '#1f7f76'], // Schneidetisch-Grün
+    ['#241026', '#8c2f63'], // Magenta
+    ['#14192c', '#33569c'], // Nachtblau
+    ['#2b1408', '#c2761c'], // Bernstein
+    ['#10241a', '#2f8f57'], // Waldgrün
+    ['#1f142c', '#6247a8'], // Violett
+    ['#2c1412', '#a83c34'], // Rostrot
   ];
   return palettes[seed % palettes.length];
 }
 
 /**
  * @param {object} options
- * @param {string} options.title
+ * @param {string} options.title Nur für das aria-label.
  * @param {string|number} options.seedSource Bestimmt die Farbwahl.
  * @param {number} options.width
  * @param {number} options.height
@@ -79,64 +62,35 @@ function paletteFor(seed) {
  */
 function buildSvg({ title, seedSource, width, height }) {
   const seed = hashString(String(seedSource));
-  const [from, to] = paletteFor(seed);
-  const gradientId = `g${seed % 100000}`;
-  const isPoster = height > width;
+  const [deep, lift] = paletteFor(seed);
+  const id = seed % 100000;
 
-  // Bewusst kleine, gesperrte Schrift: wirkt wie Postergrafik und nicht wie
-  // eine Dopplung der Überschrift, die die Filmkarte ohnehin anzeigt.
-  const maxChars = isPoster ? 20 : 30;
-  const lines = wrapText(title, maxChars, 3);
-  const fontSize = isPoster ? 27 : 36;
-  const lineHeight = fontSize * 1.35;
-  const blockHeight = lines.length * lineHeight;
-
-  /*
-   * Der Titel sitzt im oberen Drittel. Auf der Filmkarte liegt unten ein
-   * dunkler Verlauf mit den echten Filmdaten - so überlagern sich Platzhalter
-   * und Kartentext nicht.
-   */
-  const startY = height * (isPoster ? 0.3 : 0.42) - blockHeight / 2 + fontSize * 0.85;
-
-  const titleLines = lines
-    .map(
-      (line, index) =>
-        `<text x="50%" y="${(startY + index * lineHeight).toFixed(1)}" text-anchor="middle" ` +
-        `font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="${fontSize}" ` +
-        `font-weight="600" letter-spacing="${(fontSize * 0.14).toFixed(1)}" fill="#ffffff" ` +
-        `opacity="0.88">${escapeXml(line)}</text>`,
-    )
-    .join('');
-
-  // Dezente Filmstreifen-Perforation als grafisches Motiv.
-  const stripeY = height * (isPoster ? 0.58 : 0.72);
-  const holes = [];
-  const holeSize = Math.round(width * 0.035);
-  for (let x = width * 0.08; x < width * 0.93; x += holeSize * 2.4) {
-    holes.push(
-      `<rect x="${x.toFixed(1)}" y="${stripeY.toFixed(1)}" width="${holeSize}" height="${holeSize}" rx="${Math.round(
-        holeSize / 3,
-      )}" fill="#ffffff" opacity="0.16"/>`,
-    );
-  }
+  // Zwei Lichtquellen, aus dem Seed leicht verschoben – so wirkt kein Poster
+  // wie das andere, ohne dass ein Muster erkennbar wird.
+  const cx = 0.26 + ((seed >> 3) % 50) / 100;
+  const cy = 0.16 + ((seed >> 7) % 40) / 100;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(
     title,
   )}">
   <defs>
-    <linearGradient id="${gradientId}" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="${from}"/>
-      <stop offset="100%" stop-color="${to}"/>
+    <linearGradient id="b${id}" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0%" stop-color="${lift}"/>
+      <stop offset="100%" stop-color="${deep}"/>
+    </linearGradient>
+    <radialGradient id="l${id}" cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="0.75">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="v${id}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="45%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.45"/>
     </linearGradient>
   </defs>
-  <rect width="${width}" height="${height}" fill="${from}"/>
-  <rect width="${width}" height="${height}" fill="url(#${gradientId})"/>
-  <circle cx="${width * 0.82}" cy="${height * 0.14}" r="${width * 0.3}" fill="#ffffff" opacity="0.07"/>
-  <circle cx="${width * 0.1}" cy="${height * 0.92}" r="${width * 0.36}" fill="#000000" opacity="0.16"/>
-  <line x1="${(width * 0.28).toFixed(1)}" y1="${(startY - fontSize * 1.5).toFixed(1)}" x2="${(width * 0.72).toFixed(1)}" y2="${(startY - fontSize * 1.5).toFixed(1)}" stroke="#ffffff" stroke-width="1.5" opacity="0.4"/>
-  ${titleLines}
-  <line x1="${(width * 0.28).toFixed(1)}" y1="${(startY + blockHeight - fontSize * 0.5).toFixed(1)}" x2="${(width * 0.72).toFixed(1)}" y2="${(startY + blockHeight - fontSize * 0.5).toFixed(1)}" stroke="#ffffff" stroke-width="1.5" opacity="0.4"/>
-  ${holes.join('')}
+  <rect width="${width}" height="${height}" fill="${deep}"/>
+  <rect width="${width}" height="${height}" fill="url(#b${id})"/>
+  <rect width="${width}" height="${height}" fill="url(#l${id})"/>
+  <rect width="${width}" height="${height}" fill="url(#v${id})"/>
 </svg>`;
 }
 
