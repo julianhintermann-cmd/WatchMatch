@@ -14,6 +14,12 @@ on:
   push:
     branches: ['**']
     tags: ['v*.*.*']
+    # Reine Textänderungen bauen kein Image. Bei Tags greift der Filter
+    # ohnehin nicht, dort wird immer gebaut.
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - '.env.example'
   workflow_dispatch:
 
 jobs:

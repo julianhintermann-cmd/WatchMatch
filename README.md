@@ -178,7 +178,7 @@ berühren.
 | Tag | Wann |
 | --- | --- |
 | `latest` | Push auf den Default-Branch |
-| `sha-<commit>` | bei jedem Push |
+| `sha-<commit>` | bei jeder Veröffentlichung |
 | `<branchname>` | Push auf einen Branch (Schrägstriche werden zu `-`) |
 | `1.2.3` und `1.2` | Git-Tag `v1.2.3` |
 
