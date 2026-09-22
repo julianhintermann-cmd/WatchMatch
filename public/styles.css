@@ -335,6 +335,11 @@ a {
   line-height: 1.5;
 }
 
+.note--error {
+  border-left-color: var(--cue);
+  color: var(--ink);
+}
+
 .note code {
   font-family: var(--mono);
   font-size: 0.78em;
@@ -1924,6 +1929,17 @@ kbd {
   .card__overview {
     -webkit-line-clamp: 2;
     line-clamp: 2;
+  }
+}
+
+/*
+ * Als Homescreen-App läuft der Inhalt unter die Statusleiste. Der Sicherheits-
+ * abstand kommt normalerweise aus safe-area-inset-top; der Mindestwert greift
+ * auf Geräten ohne Notch, wo der Wert 0 sein kann.
+ */
+@media (display-mode: standalone) {
+  .topbar {
+    padding-top: max(env(safe-area-inset-top), 14px);
   }
 }
 

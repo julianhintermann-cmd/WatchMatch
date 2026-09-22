@@ -231,11 +231,14 @@ function registerSocketHandlers(io) {
           }
 
           rooms.startRound(room, user.id, movies, source);
-          respond(ack, { ok: true, count: movies.length, source });
+          const tmdb = movieService.tmdbStatus();
+          respond(ack, { ok: true, count: movies.length, source, tmdb });
           io.to(room.code).emit('room:movies', {
             movies: room.movies,
             startedAt: room.startedAt,
             source: room.movieSource,
+            // Damit der Client benennen kann, warum keine echten Cover kommen.
+            tmdb,
           });
           broadcastState(room);
         } finally {

@@ -98,6 +98,7 @@
     busy: false, // blockiert Swipes während einer Fly-out-Animation
     matchQueue: [],
     overlayOpen: false,
+    tmdbStatus: null, // { state: 'ok' | 'disabled' | 'error', hint? }
   };
 
   const Storage = {
@@ -169,7 +170,9 @@
     lobbyUserCount: $('lobby-user-count'),
     filters: $('filters'),
     filterHint: $('filter-hint'),
-    movieSourceNote: $('movie-source-note'),
+    noteNoKey: $('note-no-key'),
+    noteTmdbError: $('note-tmdb-error'),
+    tmdbErrorHint: $('tmdb-error-hint'),
     filterGenre: $('filter-genre'),
     filterRating: $('filter-rating'),
     filterRatingValue: $('filter-rating-value'),
@@ -430,6 +433,20 @@
         if (!user.connected) node.classList.add('peer--offline');
         dom.peerProgress.appendChild(node);
       });
+  }
+
+  /**
+   * Erklärt, woher die Filme kommen. Wichtig ist der Fehlerfall: Ist ein Key
+   * gesetzt, den TMDB ablehnt, fällt der Server auf die lokalen Filme zurück –
+   * ohne Hinweis säße man vor Platzhaltern und wüsste nicht, warum.
+   */
+  function renderMovieSourceNote() {
+    const status = state.tmdbStatus;
+    const kind = status ? status.state : null;
+
+    dom.noteNoKey.hidden = kind !== 'disabled';
+    dom.noteTmdbError.hidden = kind !== 'error';
+    dom.tmdbErrorHint.textContent = kind === 'error' && status.hint ? status.hint : '';
   }
 
   function renderMatchList(listElement, matches) {
@@ -1019,7 +1036,16 @@
         showView('swipe');
         renderStack();
         renderProgress();
-        Notify.success(`${payload.movies.length} Filme geladen – los geht's!`);
+
+        if (payload.tmdb) {
+          state.tmdbStatus = payload.tmdb;
+          renderMovieSourceNote();
+        }
+        if (payload.tmdb && payload.tmdb.state === 'error') {
+          Notify.error(payload.tmdb.hint || 'TMDB ist nicht erreichbar – es laufen die mitgelieferten Filme.');
+        } else {
+          Notify.success(`${payload.movies.length} Filme geladen – los geht's!`);
+        }
       });
 
       socket.on('room:progress', (payload) => {
@@ -1287,6 +1313,7 @@
         maxUsersPerRoom: 8,
         moviesPerRound: 40,
         yearRange: { min: 1888, max: CURRENT_YEAR + 5 },
+        tmdbStatus: null,
       };
     }
   }
@@ -1320,9 +1347,9 @@
     state.config = await loadConfig();
     populateFilterOptions(state.config);
 
-    // Nur anzeigen, wenn der Server ausdrücklich meldet, dass kein Key gesetzt
-    // ist. Bei nicht erreichbarer Konfiguration bleibt der Hinweis weg.
-    dom.movieSourceNote.hidden = state.config.tmdbEnabled !== false;
+    // Bei nicht erreichbarer Konfiguration bleibt jeder Hinweis weg.
+    state.tmdbStatus = state.config.tmdbStatus || null;
+    renderMovieSourceNote();
     setFiltersEnabled(false);
     wireEvents();
     buildHeroReel();

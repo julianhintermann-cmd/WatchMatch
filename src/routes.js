@@ -57,6 +57,7 @@ router.get('/health', (req, res) => {
     uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
     rooms: rooms.rooms.size,
     movieSource: movieService.isTmdbEnabled() ? 'tmdb' : 'fallback',
+    tmdb: movieService.tmdbStatus(),
   });
 });
 
@@ -65,8 +66,9 @@ router.get('/health', (req, res) => {
 router.get('/api/config', apiLimiter, (req, res) => {
   res.json({
     appName: 'WatchMatch',
-    // Nur ein Boolean - der Key selbst verlässt den Server nie.
+    // Nur ein Boolean bzw. ein Zustand - der Key selbst verlässt den Server nie.
     tmdbEnabled: movieService.isTmdbEnabled(),
+    tmdbStatus: movieService.tmdbStatus(),
     maxUsersPerRoom: config.maxUsersPerRoom,
     moviesPerRound: config.moviesPerRound,
     matchThreshold: config.matchThreshold,

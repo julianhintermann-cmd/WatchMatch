@@ -22,6 +22,7 @@ Raum erstellen → Raum teilen → Beitreten → Gemeinsame Filmliste
 - [Docker Compose](#docker-compose)
 - [Docker Hub und GitHub Actions](#docker-hub-und-github-actions)
 - [TMDB-Anbindung](#tmdb-anbindung)
+- [Zum Homescreen hinzufügen](#zum-homescreen-hinzufügen)
 - [Gestaltung](#gestaltung)
 - [Konfiguration](#konfiguration)
 - [REST-API](#rest-api)
@@ -216,6 +217,19 @@ beziehen. Der Key wird in der `.env` hinterlegt:
 TMDB_API_KEY=euer_key_hier
 ```
 
+TMDB gibt auf der API-Seite **zwei** Zugangsdaten aus, die sich technisch
+unterscheiden. WatchMatch erkennt automatisch, welches davon eingetragen ist,
+und verwendet es richtig:
+
+| Zugangsdatum | Aussehen | Verwendung |
+| --- | --- | --- |
+| API Key (v3 auth) | 32 Zeichen hexadezimal | als `api_key` in der URL |
+| API Read Access Token (v4) | langer Text, beginnt mit `eyJ` | als `Authorization: Bearer` im Header |
+
+Wird ein Schlüssel abgelehnt, fällt die App nicht stillschweigend zurück:
+`GET /health` und `GET /api/config` melden den Zustand unter `tmdb`, und die
+Lobby zeigt den Grund an.
+
 - Der Key wird **ausschließlich serverseitig** verwendet. `GET /api/config`
   liefert lediglich `"tmdbEnabled": true|false` – der Key selbst verlässt den
   Server nie.
@@ -265,6 +279,26 @@ Geprüft wurde außerdem: alle Trefferflächen ≥ 44 px, sichtbarer Fokus auf j
 Bedienelement, keine Emojis als Icons (durchgehend SVG mit einer Strichstärke),
 kein horizontales Scrollen bei 375 px, im Querformat und bei 22 px Grundschrift,
 und `prefers-reduced-motion` schaltet Bewegung ab.
+
+## Zum Homescreen hinzufügen
+
+Die App lässt sich auf dem Handy wie eine native App ablegen: in Safari über
+*Teilen → Zum Home-Bildschirm*, in Chrome über *Zum Startbildschirm hinzufügen*.
+Sie startet dann im Vollbild ohne Browserleiste und bekommt ein eigenes Symbol.
+
+Die PNG-Symbole entstehen aus `public/icon.svg`. Wer das Symbol ändert, passt
+diese Datei an und erzeugt die Rastergrößen neu, zum Beispiel mit
+`rsvg-convert`:
+
+```bash
+rsvg-convert -w 180 -h 180 public/icon.svg -o public/apple-touch-icon.png
+rsvg-convert -w 192 -h 192 public/icon.svg -o public/icon-192.png
+rsvg-convert -w 512 -h 512 public/icon.svg -o public/icon-512.png
+```
+
+Das SVG ist bewusst randlos: iOS und Android legen ihre eigene abgerundete
+Maske darüber. Ein vorgerundetes Symbol bekäme doppelte Ecken. Für iOS ist das
+PNG Pflicht – `apple-touch-icon` wertet kein SVG aus.
 
 ## Konfiguration
 
@@ -360,7 +394,12 @@ watchmatch/
 │   ├── index.html               Single-Page-App
 │   ├── app.js                   Client (Socket, Swipes, Matches, UI)
 │   ├── styles.css               Gestaltung, Mobile First, ohne CDN
-│   ├── favicon.svg
+│   ├── favicon.svg              Browser-Tab
+│   ├── icon.svg                 Vorlage für die App-Icons
+│   ├── apple-touch-icon.png     Homescreen-Symbol (iOS, 180x180)
+│   ├── icon-192.png             Homescreen-Symbol (Android / Manifest)
+│   ├── icon-512.png
+│   ├── manifest.webmanifest
 │   └── fonts/                   selbst gehostete Schriften (+ LICENSE.md)
 ├── test/
 │   ├── rooms.test.js            Raum- und Match-Logik

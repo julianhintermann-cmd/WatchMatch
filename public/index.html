@@ -9,7 +9,24 @@
       content="WatchMatch – swipt gemeinsam durch eine Filmrolle und findet heraus, was ihr heute Abend sehen wollt."
     />
     <title>WatchMatch – Find a movie. Match together.</title>
+
+    <!-- Browser-Tab -->
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png" />
+
+    <!--
+      Homescreen-Symbol. iOS wertet ausschliesslich apple-touch-icon aus und
+      akzeptiert dort kein SVG, deshalb das PNG. Die abgerundete Maske legt
+      iOS selbst darüber.
+    -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Als Lesezeichen gestartet: eigene App statt Safari-Fenster. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="WatchMatch" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="preload" href="/fonts/bigshoulders-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/styles.css" />
@@ -222,10 +239,16 @@
           </header>
           <p class="panel__sub" id="filter-hint">Nur der Host kann die Filter ändern.</p>
 
-          <p class="note" id="movie-source-note" hidden>
+          <p class="note" id="note-no-key" hidden>
             Diese Runde läuft ohne TMDB-Key: Es kommen die 60 mitgelieferten
             Filme, und ihre Poster werden erzeugt. Echte Cover gibt es erst mit
             einem Key in <code>TMDB_API_KEY</code>.
+          </p>
+
+          <p class="note note--error" id="note-tmdb-error" hidden>
+            Ein TMDB-Key ist gesetzt, aber der Abruf scheitert – deshalb laufen
+            die mitgelieferten Filme.
+            <span id="tmdb-error-hint"></span>
           </p>
 
           <div class="filters" id="filters">

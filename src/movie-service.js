@@ -209,17 +209,51 @@ function isTmdbEnabled() {
   return config.tmdbApiKey.length > 0;
 }
 
+/**
+ * TMDB gibt zwei Zugangsdaten aus, die sich nicht gleich verwenden lassen:
+ *
+ *   API Key (v3 auth)         32-stelliger Hex-String, als `api_key` in der URL
+ *   API Read Access Token (v4) JWT, als `Authorization: Bearer` im Header
+ *
+ * Beide werden hier unterstützt, weil erfahrungsgemäß oft der falsche kopiert
+ * wird. Ein JWT beginnt immer mit `eyJ` und enthält Punkte.
+ */
+function usesBearerToken() {
+  return /^eyJ[\w-]+\.[\w-]+\./.test(config.tmdbApiKey);
+}
+
+/** Welche Art Zugangsdatum konfiguriert ist - für Diagnose und Logausgabe. */
+function credentialKind() {
+  if (!isTmdbEnabled()) return 'none';
+  return usesBearerToken() ? 'read-access-token' : 'api-key';
+}
+
+/**
+ * Merkt sich den letzten TMDB-Fehler. Ohne das fällt die App bei einem
+ * abgelehnten Schlüssel still auf die lokalen Filme zurück, und niemand
+ * erfährt, warum keine echten Cover erscheinen.
+ */
+let lastTmdbError = null;
+
+function tmdbStatus() {
+  if (!isTmdbEnabled()) return { state: 'disabled', credential: 'none' };
+  if (lastTmdbError) return { state: 'error', credential: credentialKind(), ...lastTmdbError };
+  return { state: 'ok', credential: credentialKind() };
+}
+
 /** `fetch` mit Timeout - hängende Requests blockieren so keine Raumrunde. */
 async function fetchJson(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.tmdbTimeoutMs);
+  const headers = { Accept: 'application/json' };
+  if (usesBearerToken()) headers.Authorization = `Bearer ${config.tmdbApiKey}`;
+
   try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: { Accept: 'application/json' },
-    });
+    const response = await fetch(url, { signal: controller.signal, headers });
     if (!response.ok) {
-      throw new Error(`TMDB antwortete mit HTTP ${response.status}`);
+      const error = new Error(`TMDB antwortete mit HTTP ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
     return await response.json();
   } finally {
@@ -229,7 +263,6 @@ async function fetchJson(url) {
 
 function buildDiscoverUrl(filters, page) {
   const params = new URLSearchParams({
-    api_key: config.tmdbApiKey,
     language: config.tmdbLanguage,
     sort_by: 'popularity.desc',
     include_adult: 'false',
@@ -241,6 +274,7 @@ function buildDiscoverUrl(filters, page) {
   if (filters.minRating > 0) params.set('vote_average.gte', String(filters.minRating));
   if (filters.yearFrom !== null) params.set('primary_release_date.gte', `${filters.yearFrom}-01-01`);
   if (filters.yearTo !== null) params.set('primary_release_date.lte', `${filters.yearTo}-12-31`);
+  if (!usesBearerToken()) params.set('api_key', config.tmdbApiKey);
   return `${config.tmdbBaseUrl}/discover/movie?${params.toString()}`;
 }
 
@@ -266,10 +300,8 @@ async function enrichWithRuntime(movies) {
     const chunk = movies.slice(i, i + chunkSize);
     const results = await Promise.allSettled(
       chunk.map((movie) => {
-        const params = new URLSearchParams({
-          api_key: config.tmdbApiKey,
-          language: config.tmdbLanguage,
-        });
+        const params = new URLSearchParams({ language: config.tmdbLanguage });
+        if (!usesBearerToken()) params.set('api_key', config.tmdbApiKey);
         const tmdbId = movie.id.replace(/^tmdb-/, '');
         return fetchJson(`${config.tmdbBaseUrl}/movie/${tmdbId}?${params.toString()}`);
       }),
@@ -314,9 +346,28 @@ async function fetchFromTmdb(filters, count) {
     }
 
     writeCache(key, movies);
+    lastTmdbError = null;
     return movies;
   } catch (error) {
-    console.warn('[tmdb] Abruf fehlgeschlagen, nutze Fallback-Daten:', error.message);
+    // Ein abgelehnter Schlüssel ist etwas anderes als ein Netzwerkproblem.
+    // Beides wird festgehalten, damit /health und /api/config es benennen
+    // können, statt still auf die lokalen Filme zurückzufallen.
+    const status = Number(error.status) || null;
+    let hint = null;
+    if (status === 401) {
+      hint = usesBearerToken()
+        ? 'TMDB lehnt den Read Access Token ab. Prüfe, ob er vollständig kopiert wurde.'
+        : 'TMDB lehnt den API-Key ab. Hast du versehentlich den Read Access Token als API Key eingetragen?';
+    } else if (status === 404) {
+      hint = 'TMDB kennt diesen Endpunkt nicht - vermutlich ein unvollständiger Schlüssel.';
+    } else if (status) {
+      hint = `TMDB antwortete mit HTTP ${status}.`;
+    } else {
+      hint = 'TMDB war nicht erreichbar. Hat der Server Internetzugang?';
+    }
+
+    lastTmdbError = { status, hint, at: new Date().toISOString() };
+    console.warn(`[tmdb] Abruf fehlgeschlagen (${error.message}) - nutze Fallback-Filme. ${hint}`);
     return null;
   }
 }
@@ -365,6 +416,8 @@ async function getMovies(rawFilters, options = {}) {
 
 module.exports = {
   getMovies,
+  tmdbStatus,
+  credentialKind,
   sanitizeFilters,
   defaultFilters,
   normalizeMovie,
