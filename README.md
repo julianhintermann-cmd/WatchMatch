@@ -226,8 +226,13 @@ TMDB_API_KEY=euer_key_hier
 
 **Ohne Key oder wenn TMDB nicht erreichbar ist**, greift automatisch der
 lokale Datensatz aus `src/fallback-movies.js` (60 Filme von 1942 bis 2023).
-Die Poster dafür erzeugt der Server selbst als SVG – es werden keine externen
-Bilder geladen. Die App ist dadurch auch komplett offline voll funktionsfähig.
+Die App ist dadurch auch komplett offline voll funktionsfähig.
+
+> **Echte Filmcover gibt es nur mit Key.** Der Fallback bringt Titel, Jahr,
+> Bewertung, Genres und Beschreibung mit, aber keine Poster – echte Cover
+> dürfen nicht mitgeliefert werden. Der Server erzeugt stattdessen farbige
+> Platzhalter mit dem Filmfenster-Zeichen der App. Die Lobby weist darauf hin,
+> solange kein Key gesetzt ist.
 
 ## Gestaltung
 

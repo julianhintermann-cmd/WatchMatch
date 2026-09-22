@@ -323,6 +323,25 @@ a {
   text-align: center;
 }
 
+/* Sachlicher Hinweis, kein Fehler – daher gedeckt statt alarmierend. */
+.note {
+  margin-bottom: 18px;
+  padding: 11px 14px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--lamp);
+  border-radius: var(--r-sm);
+  color: var(--ink-dim);
+  font-size: 0.844rem;
+  line-height: 1.5;
+}
+
+.note code {
+  font-family: var(--mono);
+  font-size: 0.78em;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
 /* Lampe: Form unterscheidet die Zustände, nicht nur die Farbe. */
 .lamp {
   width: 9px;

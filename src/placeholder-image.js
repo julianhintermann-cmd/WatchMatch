@@ -53,6 +53,31 @@ function paletteFor(seed) {
 }
 
 /**
+ * Das Filmfenster-Zeichen der App, dezent in die Fläche gesetzt.
+ *
+ * Ohne diese Marke sieht ein Platzhalter wie ein Bild aus, das nicht geladen
+ * hat. Mit ihr ist erkennbar, dass hier absichtlich kein Cover liegt.
+ */
+function gateMark(width, height) {
+  const size = Math.round(Math.min(width, height) * 0.26);
+  const x = (width - size) / 2;
+  const y = height * (height > width ? 0.44 : 0.5) - size / 2;
+  const scale = (size / 24).toFixed(4);
+
+  return `  <g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${scale})" opacity="0.16">
+    <g fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="3"/>
+      <path d="M7 4v16"/>
+    </g>
+    <g fill="#ffffff">
+      <rect x="4.2" y="7.1" width="1.9" height="2" rx="0.5"/>
+      <rect x="4.2" y="11" width="1.9" height="2" rx="0.5"/>
+      <rect x="4.2" y="14.9" width="1.9" height="2" rx="0.5"/>
+    </g>
+  </g>`;
+}
+
+/**
  * @param {object} options
  * @param {string} options.title Nur für das aria-label.
  * @param {string|number} options.seedSource Bestimmt die Farbwahl.
@@ -91,6 +116,7 @@ function buildSvg({ title, seedSource, width, height }) {
   <rect width="${width}" height="${height}" fill="url(#b${id})"/>
   <rect width="${width}" height="${height}" fill="url(#l${id})"/>
   <rect width="${width}" height="${height}" fill="url(#v${id})"/>
+${gateMark(width, height)}
 </svg>`;
 }
 

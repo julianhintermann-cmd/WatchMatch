@@ -169,6 +169,7 @@
     lobbyUserCount: $('lobby-user-count'),
     filters: $('filters'),
     filterHint: $('filter-hint'),
+    movieSourceNote: $('movie-source-note'),
     filterGenre: $('filter-genre'),
     filterRating: $('filter-rating'),
     filterRatingValue: $('filter-rating-value'),
@@ -1318,6 +1319,10 @@
   async function init() {
     state.config = await loadConfig();
     populateFilterOptions(state.config);
+
+    // Nur anzeigen, wenn der Server ausdrücklich meldet, dass kein Key gesetzt
+    // ist. Bei nicht erreichbarer Konfiguration bleibt der Hinweis weg.
+    dom.movieSourceNote.hidden = state.config.tmdbEnabled !== false;
     setFiltersEnabled(false);
     wireEvents();
     buildHeroReel();
