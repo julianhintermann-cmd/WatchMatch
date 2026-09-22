@@ -1,0 +1,27 @@
+<!--
+  App-Icon für den Homescreen. Bewusst randlos: iOS und Android legen ihre
+  eigene abgerundete Maske darüber, ein vorgerundetes Icon bekäme sonst
+  doppelte Ecken. Aus dieser Datei werden die PNGs erzeugt (siehe README).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="lamp" cx="0.5" cy="0.12" r="0.85">
+      <stop offset="0%" stop-color="#FF9E1B" stop-opacity="0.26" />
+      <stop offset="100%" stop-color="#FF9E1B" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#120E0A" />
+  <rect width="512" height="512" fill="url(#lamp)" />
+
+  <g fill="none" stroke="#FF9E1B" stroke-width="26" stroke-linejoin="round">
+    <rect x="106" y="123" width="300" height="266" rx="46" />
+    <path d="M173 123v266" />
+  </g>
+
+  <g fill="#FF9E1B">
+    <rect x="124" y="174" width="36" height="38" rx="10" />
+    <rect x="124" y="237" width="36" height="38" rx="10" />
+    <rect x="124" y="300" width="36" height="38" rx="10" />
+  </g>
+</svg>
